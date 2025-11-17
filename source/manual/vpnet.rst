@@ -396,16 +396,32 @@ bound to the tunnel interface.
 
 The advantage of this type of setup is one can use standard or advanced routing technologies to forward traffic around tunnels.
 
-.. Note::
+.. Important::
 
-    In order to filter traffic on the :code:`if_ipsec(4)` device some tunables need to be set. Both :code:`net.inet.ipsec.filtertunnel`
-    and :code:`net.inet6.ipsec6.filtertunnel` need to be set to :code:`1` and :code:`net.enc.in.ipsec_filter_mask` and :code:`net.enc.out.ipsec_filter_mask`
-    need to be set to :code:`0` in order to allow rules on the device. The downside is that policy based tunnels (:code:`enc0`) can not be filtered
-    anymore as this changes the behaviour from filtering on the :code:`enc0` device to the :code:`if_ipsec(4)` devices.
+    Contrary to other physical or virtual interfaces, there are some important caveats to take into consideration when deciding to
+    set up your network with VTI tunnels:
 
-.. Warning::
+    - By default, OPNsense can only filter on the :code:`IPsec` group (:code:`enc0`).
+    - VTI interfaces show up as regular interfaces in the GUI, but firewall rules specified on these interfaces will not apply by default.
+      Instead, they must be specified on the :code:`IPsec` group (:code:`enc0`).
+      The OS makes a hard distinction between filtering on the :code:`IPsec` group and VTI interfaces. To flip this behavior, the following tunables
+      must be specified:
 
-    Currently it does not seem to be possible to add NAT rules for :code:`if_ipsec(4)` devices.
+      - :code:`net.inet.ipsec.filtertunnel`, value :code:`1`.
+      - :code:`net.inet6.ipsec6.filtertunnel`, value :code:`1`.
+      - :code:`net.enc.in.ipsec_filter_mask`, value :code:`0`.
+      - :code:`net.enc.out.ipsec_filter_mask`, value :code:`0`.
+
+      The downside is that policy-based tunnels (:code:`enc0`) cannot be filtered anymore.
+
+    - If you require a combination of Policy-based and VTI-based tunnels in your setup, the recommended filtering approach
+      is to specify all firewall rules on the automatically available :code:`IPsec` group (:code:`enc0`).
+      Since all IPsec traffic passes through :code:`enc0`, both policy-based and VTI-based traffic can be filtered here.
+    - NAT rules can be specified on VTI interfaces in pure VTI-based setups without issue. However, if you require NAT
+      on the VTI-based traffic, but you are filtering on the :code:`IPsec` group, you must enable the
+      :code:`Skip firewall rules` option in the Virtual Tunnel Interface configuration, so no (automatic) rules
+      interfere with the traffic.
+
 
 .. Warning::
 
@@ -521,9 +537,20 @@ considerations should be taken into account:
 Tuning considerations
 .................................
 
-Depending on the workload (many different IPsec flows or a single flow), it might help to enable multithreaded crypto mode
-on :code:`ipsec`, in which case cryptographic packets are dispatched to multiple processors (especially when only a single
-tunnel is being used).
+In normal routing/firewalling scenarios, most significant performance gains in terms of throughput are achieved by distributing flows
+across multiple CPU cores. In any physical or virtual setup, flow distribution is often determined by hardware RSS on a NIC,
+or virtual queues emulating this behavior. Such flows are processed by default on the receiving CPU (direct dispatch via netisr),
+making sure that traffic is processed in parallel. The distribution mechanism (before any OS processing) making this possible often hashes
+the IP/TCP/UDP 5-tuple to determine on which CPU a flow should be handled. Proper distribution therefore requires proper uniqueness
+of packet headers.
+
+When any tunneling takes place, as is the case for IPsec with ESP flows, many different traffic flows may be
+encapsulated inside a single IP header, reducing uniqueness of traffic and therefore the ability to distribute work. Unless
+NICs or virtualized queues can distribute work on ESP packets, which is rarely the case, OPNsense firewalls can often only
+receive such tunneled flows on a single CPU, because the outer IP header is often the same.
+
+If you have a simple, single-tunnel, single-flow setup (two flows for in-out), you may benefit from using async crypto to dispatch cryptographic work
+to multiple processors. However, there is no guarantee this will speed up work as it is dependent on multiple factors.
 
 In order to do so, add or change the following tunable in :menuselection:`System --> Settings --> Tunables`:
 
@@ -531,15 +558,48 @@ In order to do so, add or change the following tunable in :menuselection:`System
 
     :code:`net.inet.ipsec.async_crypto` = **1**
 
-To distribute load better over available cores in the system, it may help to enable :doc:`receive side scaling </troubleshooting/performance>`.
-In which case the following tunables need to be changed:
+
+
+As soon as an IPsec packet is received, decryption must be handled first before anything meaningful can be done with the actual data. This process
+can be parallelized with the command above, but because IPsec packets need to be processed in an explicit order, these have to be re-injected in the same one,
+often making performance gains negligible - especially when the machine is busy. The FreeBSD kernel queues decapsulated IPsec packets at all times,
+in contrast to regular ethernet frame handling (see technical note below). This also means that IPsec flows must adhere to the default single thread
+limitation after decryption. To fan out the traffic to multiple CPUs after decryption, you can increase the amount of threads bound to netisr:
 
 .. Note::
-
-    * :code:`net.isr.bindthreads` = **1**
     * :code:`net.isr.maxthreads` = **-1**   <-- equal the number of cores in the machine
-    * :code:`net.inet.rss.enabled` = **1**
-    * :code:`net.inet.rss.bits` = **X** <-- see :doc:`rss </troubleshooting/performance>` document.
+
+
+You can also be more specific and set only N amount cores to be used for ipsec traffic processing.
+
+In very busy environments, this change likely has the most impact.
+
+Lastly, but less practical, you can scale up IPsec by ensuring distribution earlier on in the chain by spreading out more flows across
+multiple IKE SAs (different source/destination selectors). In this scenario you must ensure multiple ESP flows coming from different
+source IP addresses when configuring site-to-site tunnels. You must combine this with the :code:`net.isr.maxthreads` setting to keep
+the traffic distributed while it is routed through the system.
+
+.. admonition:: Technical background
+
+    `Netisr <https://man.freebsd.org/cgi/man.cgi?format=html&query=netisr(9)>`__ can be thought of as the conceptual equivalent
+    of Receive Packet Steering (RPS) in Linux. How packets are distributed throughout the system is dependent on the packet protocol.
+
+    Netisr allows for two basic modes of operation: direct dispatch or deferred (queued) dispatch. Netisr is always single-threaded by
+    default in deferred dispatch mode to make sure the system adheres to the strong ordering requirements in protocols.
+
+    In direct dispatch mode, the network driver handling the packet receive buffer moves the packets up the stack. If the packet is
+    to be routed out via a different interface, this entire process is handled in the same thread (including decryption for IPsec,
+    unless async crypto is set), which doesn't exit until the packet is routed out. During this time, the receive buffer may fill with
+    new packets. In this mode, the single-threaded limitation doesn't apply as the execution context remains on the receiving thread, of
+    which there are often multiple via the data channels provided by the NICs/drivers.
+
+    In deferred dispatch mode, the first protocol allowing deferred processing will queue the packet, at which point the driver input
+    routine will exit immediately, so it can process new packets faster. This decoupling allows netisr to control which flows are
+    executed on which threads (and by extension, CPU).
+
+    When it comes to IPsec, packets are always queued via netisr after decryption. Because netisr is single-threaded in this mode,
+    it's always queued to the same separate thread. The :code:`maxthreads` option overcomes this limitation. Furthermore, the SPI value
+    is used to calculate which thread the flow ends up on. This is true for both VTI- and policy-based configurations.
 
 
 .................................

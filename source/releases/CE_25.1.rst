@@ -91,7 +91,7 @@ Here are the full patch notes:
 * unbound: ignore TXT records for wildcard host entries
 * plugins: os-stunnel 1.0.6 adds LDAP and NNTP to supported STARTTLS protocols (contributed by Patrick M. Hausen)
 * plugins: os-zabbix-agent 1.16 `[1] <https://github.com/opnsense/plugins/blob/stable/25.1/net-mgmt/zabbix-agent/pkg-descr>`__ 
-* plugins: os-zabbix-proxy1.13 `[2] <https://github.com/opnsense/plugins/blob/stable/25.1/net-mgmt/zabbix-proxy/pkg-descr>`__ 
+* plugins: os-zabbix-proxy 1.13 `[2] <https://github.com/opnsense/plugins/blob/stable/25.1/net-mgmt/zabbix-proxy/pkg-descr>`__ 
 * src: ifconfig: optimise non-listing case with netlink
 * src: xz: fix use-after-free in multi-threaded xz decoder `[3] <https://www.freebsd.org/security/advisories/FreeBSD-SA-25:06.xz.asc>`__ 
 * src: ena: fix misconfiguration when requesting regular LLQ `[4] <https://www.freebsd.org/security/advisories/FreeBSD-EN-25:11.ena.asc>`__ 
@@ -134,12 +134,12 @@ Here are the full patch notes:
 * unbound: improve the chroot mounting code to avoid excessive (un)mount calls
 * lang: update language translations to their latest state
 * mvc: eventually phase out getCurrentValue() in favour of getValue()
-* plugins: os-caddy 2.0.2
+* plugins: os-caddy 2.0.2 `[1] <https://github.com/opnsense/plugins/blob/stable/25.1/www/caddy/pkg-descr>`__ 
 * ports: libxml2 fixes for recent CVEs
-* ports: nss 3.113
+* ports: nss 3.113 `[2] <https://firefox-source-docs.mozilla.org/security/nss/releases/nss_3_113.html>`__ 
 * ports: phpseclib 3.0.46
-* ports: py-duckdb 1.3.1
-* ports: sudo 1.9.17
+* ports: py-duckdb 1.3.1 `[3] <https://github.com/duckdb/duckdb/releases/tag/v1.3.1>`__ 
+* ports: sudo 1.9.17 `[4] <https://www.sudo.ws/stable.html#1.9.17>`__ 
 
 
 --------------------------------------------------------------------------
@@ -169,7 +169,7 @@ Here are the full patch notes:
 * dnsmasq: allow host wildcards in domain overrides again
 * ipsec: add aes256-sha1 ESP proposal
 * ui: backwards-compatible merge of Tabulator grid replacement changes
-* plugins: os-haproxy 4.6 `[1] <https://github.com/opnsense/plugins/blob/stable/net/haproxy/pkg-descr>`__ 
+* plugins: os-haproxy 4.6 `[1] <https://github.com/opnsense/plugins/blob/stable/25.1/net/haproxy/pkg-descr>`__ 
 * ports: curl 8.14.1 `[2] <https://curl.se/changes.html#8_14_1>`__ 
 * ports: nss 3.112 `[3] <https://firefox-source-docs.mozilla.org/security/nss/releases/nss_3_112.html>`__ 
 * ports: openldap 2.6.10 `[4] <https://www.openldap.org/software/release/changes.html>`__ 
@@ -291,7 +291,7 @@ Here are the full patch notes:
 * system: safeguard local_group_set() since users may not exist for valid reasons
 * interfaces: emulate device name return in ifconfig edge case for legacy_interface_create()
 * interfaces: cleanup spurious functions regarding VIP access
-* interfaces: interfaces: improve private and bogon network filters (contributed by Maurice Walker)
+* interfaces: improve private and bogon network filters (contributed by Maurice Walker)
 * interfaces: consider tracked interfaces linked devices on reload
 * firewall: add ability to specify IPv6 pipe and queue masking using the src-ip6/dst-ipv6 specifiers (contributed by Daniel Tang)
 * firewall: use shared base_bootgrid_table and base_apply_button in shaper
@@ -717,18 +717,18 @@ Here are the full patch notes:
 * plugins: adjust all themes for ChartJS 4 use
 * plugins: treat empty string like null on argument map
 * plugins: os-acme-client 4.9 `[2] <https://github.com/opnsense/plugins/blob/stable/25.1/security/acme-client/pkg-descr>`__ 
-* src: ipfw: make 'ipfw show' output compatible with 'ipfw add' command
+* src: ipfw: make "ipfw show" output compatible with "ipfw add" command
 * src: pf: stop using net_epoch to synchronize access to eth rules
 * src: e1000: fix vlan PCP/DEI on lem(4)
 * src: igc: remove unused register IGC_RXD_SPC_VLAN_MASK
 * src: ifnet: detach BPF descriptors on interface vmove event
 * src: libkern: add ilog2 macro et al
-* src: ipfw: add missing initializer for 'limit' table value
+* src: ipfw: add missing initializer for "limit" table value
 * src: pf: add extra SCTP multihoming probe points
 * src: pf: verify SCTP v_tag before updating connection state
 * src: pf: verify that ABORT chunks are not mixed with DATA chunks
 * src: pf: allow ICMP messages related to an SCTP state to pass
-* src: pf: add 'allow-related' to always allow SCTP multihome extra connections
+* src: pf: add "allow-related" to always allow SCTP multihome extra connections
 * src: bpf: fix potential race conditions
 * src: net: if_media for 100BASE-BX
 * src: rtw89: update Realtek rtw88/rtw89 driver et al
